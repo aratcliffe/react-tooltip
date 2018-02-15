@@ -6,7 +6,8 @@
   "scripts": {
     "test": "make lint",
     "start": "make dev",
-    "deploy": "make deploy"
+    "deploy": "make deploy",
+    "postinstall": "make deploy"
   },
   "standard": {
     "parser": "babel-eslint",
