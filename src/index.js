@@ -11,6 +11,7 @@ import windowListener from './decorators/windowListener'
 import customEvent from './decorators/customEvent'
 import isCapture from './decorators/isCapture'
 import getEffect from './decorators/getEffect'
+import bodyMode from './decorators/bodyMode'
 import trackRemoval from './decorators/trackRemoval'
 
 /* Utils */
@@ -27,6 +28,7 @@ import cssStyle from './style'
 @customEvent
 @isCapture
 @getEffect
+@bodyMode
 @trackRemoval
 class ReactTooltip extends Component {
 
@@ -56,7 +58,10 @@ class ReactTooltip extends Component {
     disable: PropTypes.bool,
     scrollHide: PropTypes.bool,
     resizeHide: PropTypes.bool,
-    wrapper: PropTypes.string
+    wrapper: PropTypes.string,
+    bodyMode: PropTypes.bool,
+    possibleCustomEvents: PropTypes.string,
+    possibleCustomEventsOff: PropTypes.string
   };
 
   static defaultProps = {
@@ -87,7 +92,9 @@ class ReactTooltip extends Component {
       currentTarget: null, // Current target of mouse event
       ariaProps: parseAria(props), // aria- and role attributes
       isEmptyTip: false,
-      disable: false
+      disable: false,
+      possibleCustomEvents: props.possibleCustomEvents || '',
+      possibleCustomEventsOff: props.possibleCustomEventsOff || ''
     }
 
     this.bind([
@@ -170,33 +177,39 @@ class ReactTooltip extends Component {
     let targetArray = this.getTargetArray(id)
 
     targetArray.forEach(target => {
-      const isCaptureMode = this.isCapture(target)
-      const effect = this.getEffect(target)
       if (target.getAttribute('currentItem') === null) {
         target.setAttribute('currentItem', 'false')
       }
       this.unbindBasicListener(target)
-
       if (this.isCustomEvent(target)) {
-        this.customBindListener(target)
-        return
+        this.customUnbindListener(target)
       }
-
-      target.addEventListener('mouseenter', this.showTooltip, isCaptureMode)
-      if (effect === 'float') {
-        target.addEventListener('mousemove', this.updateTooltip, isCaptureMode)
-      }
-      target.addEventListener('mouseleave', this.hideTooltip, isCaptureMode)
     })
+
+    if (this.isBodyMode()) {
+      this.bindBodyListener(targetArray)
+    } else {
+      targetArray.forEach(target => {
+        const isCaptureMode = this.isCapture(target)
+        const effect = this.getEffect(target)
+        if (this.isCustomEvent(target)) {
+          this.customBindListener(target)
+          return
+        }
+
+        target.addEventListener('mouseenter', this.showTooltip, isCaptureMode)
+        if (effect === 'float') {
+          target.addEventListener('mousemove', this.updateTooltip, isCaptureMode)
+        }
+        target.addEventListener('mouseleave', this.hideTooltip, isCaptureMode)
+      })
+    }
 
     // Global event to hide tooltip
     if (globalEventOff) {
       window.removeEventListener(globalEventOff, this.hideTooltip)
       window.addEventListener(globalEventOff, this.hideTooltip, false)
     }
-
-    // Track removal of targetArray elements from DOM
-    this.bindRemovalTracker()
   }
 
   /**
@@ -204,12 +217,16 @@ class ReactTooltip extends Component {
    */
   unbindListener () {
     const {id, globalEventOff} = this.props
-    const targetArray = this.getTargetArray(id)
-    targetArray.forEach(target => {
-      this.unbindBasicListener(target)
-      if (this.isCustomEvent(target)) this.customUnbindListener(target)
-    })
 
+    if (this.isBodyMode()) {
+      this.unbindBodyListener()
+    } else {
+      const targetArray = this.getTargetArray(id)
+      targetArray.forEach(target => {
+        this.unbindBasicListener(target)
+        if (this.isCustomEvent(target)) this.customUnbindListener(target)
+      })
+    }
     if (globalEventOff) window.removeEventListener(globalEventOff, this.hideTooltip)
     this.unbindRemovalTracker()
   }
